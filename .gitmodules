@@ -1,9 +1,9 @@
 [submodule "frida-gum"]
 	path = subprojects/frida-gum
-	url = https://github.com/frida/frida-gum.git
+	url = https://github.com/rubenvereecken/frida-gum-stealth.git
 [submodule "frida-core"]
 	path = subprojects/frida-core
-	url = https://github.com/frida/frida-core.git
+	url = https://github.com/rubenvereecken/frida-core-stealth.git
 [submodule "frida-python"]
 	path = subprojects/frida-python
 	url = https://github.com/frida/frida-python.git
