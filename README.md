@@ -1,60 +1,127 @@
-# Frida
+# Frida Stealth
 
-Dynamic instrumentation toolkit for developers, reverse-engineers, and security
-researchers. Learn more at [frida.re](https://frida.re/).
+A maintained fork of [Frida](https://frida.re/) with stealth patches applied to evade common detection methods.
 
-Two ways to install
-===================
+**Inspiration & Credits:** This project builds upon the excellent work from [AsenOsen/frida-stealth](https://github.com/AsenOsen/frida-stealth) and [JsHookApp/Frida-Patchs](https://github.com/JsHookApp/Frida-Patchs).
 
-## 1. Install from prebuilt binaries
+## What does it do?
 
-This is the recommended way to get started. All you need to do is:
+These patches modify Frida to avoid common detection patterns:
 
-    pip install frida-tools # CLI tools
-    pip install frida       # Python bindings
-    npm install frida       # Node.js bindings
+- Obfuscated thread names (no more "frida-\*" threads)
+- Renamed internal loops and data structures
+- Modified default port numbers
+- Anonymized unix socket names
+- Cleaned SELinux context names
 
-You may also download pre-built binaries for various operating systems from
-Frida's [releases](https://github.com/frida/frida/releases) page on GitHub.
+For additional Android-specific stealth techniques, see [AsenOsen's framework patching approach](https://github.com/AsenOsen/android-framework-jar-patching).
 
-## 2. Build your own binaries
+## Getting Started
 
-Run:
+### Option 1: Pre-patched (Recommended)
 
-    make
+This repository maintains pre-patched versions of Frida. Simply clone and build:
 
-You may also invoke `./configure` first if you want to specify a `--prefix`, or
-any other options.
+```bash
+git clone --recurse-submodules https://github.com/rubenvereecken/frida.git
+cd frida
+```
 
-### CLI tools
+**Initialize submodules:**
 
-For running the Frida CLI tools, e.g. `frida`, `frida-ls-devices`, `frida-ps`,
-`frida-kill`, `frida-trace`, `frida-discover`, etc., you need a few packages:
+```bash
+git submodule update --init --recursive
+```
 
-    pip install colorama prompt-toolkit pygments
+**Optional:** If you need a specific Frida version, checkout the corresponding branch before building:
 
-### Apple OSes
+```bash
+git checkout stealth/17.3.2
+git submodule update --init --recursive
+```
 
-First make a trusted code-signing certificate. You can use the guide at
-https://sourceware.org/gdb/wiki/PermissionsDarwin in the sections
-“Create a certificate in the System Keychain” and “Trust the certificate
-for code signing”. You can use the name `frida-cert` instead of `gdb-cert`
-if you'd like.
+Then build Frida as normal. For detailed build instructions, see the [official Frida documentation](https://frida.re/docs/building/).
 
-Next export the name of the created certificate to relevant environment
-variables, and run `make`:
+#### Quick build examples
 
-    export MACOS_CERTID=frida-cert
-    export IOS_CERTID=frida-cert
-    export WATCHOS_CERTID=frida-cert
-    export TVOS_CERTID=frida-cert
-    make
+**Python bindings:**
 
-To ensure that macOS accepts the newly created certificate, restart the
-`taskgated` daemon:
+```bash
+make python-macos  # or python-linux, python-windows
+pip install subprojects/frida-python
+```
 
-    sudo killall taskgated
+**Android (arm64):**
 
-## Learn more
+```bash
+export ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/25.2.9519653"
+make core-android-arm64
+```
 
-Have a look at our [documentation](https://frida.re/docs/home/).
+Binaries will be in `build/frida-android-arm64/`.
+
+### Option 2: Manual Patching (For Maintainers)
+
+If you're maintaining your own Frida fork and want to apply these patches manually:
+
+**Apply patches to frida-core:**
+
+```bash
+cd subprojects/frida-core
+git apply /path/to/frida-stealth/subprojects/frida-core/patches/*.patch
+```
+
+**Apply patches to frida-gum:**
+
+```bash
+cd subprojects/frida-gum
+git apply /path/to/frida-stealth/subprojects/frida-gum/patches/*.patch
+```
+
+Note: Patches are maintained for each Frida version. Use patches from the corresponding `stealth/X.Y.Z` branch.
+
+After applying patches, build Frida normally following [official build instructions](https://frida.re/docs/building/).
+
+## Additional Stealth Techniques
+
+For Android, consider these complementary approaches:
+
+1. **[ZygiskFrida](https://github.com/lico-n/ZygiskFrida)** - Inject via Zygisk to avoid ptrace detection
+   - Use with [Kitsune Magisk](https://github.com/HuskyDG/magisk-files) (not regular Magisk)
+2. **[AntiFrida Bypass Scripts](https://github.com/apkunpacker/AntiFrida_Bypass)** - Runtime memory obfuscation
+3. **[Framework Patching](https://github.com/AsenOsen/android-framework-jar-patching)** - System library injection
+
+## Building from Source (Platform-Specific)
+
+### Apple Platforms
+
+Create a code-signing certificate first (see [GDB's guide](https://sourceware.org/gdb/wiki/PermissionsDarwin)):
+
+```bash
+export MACOS_CERTID=frida-cert
+export IOS_CERTID=frida-cert
+make
+sudo killall taskgated  # Restart taskgated to accept new cert
+```
+
+### CLI Tools
+
+Install required Python packages:
+
+```bash
+pip install colorama prompt-toolkit pygments
+```
+
+## Learn More
+
+- [Official Frida Documentation](https://frida.re/docs/home/)
+- [Building Frida](https://frida.re/docs/building/)
+- [Original Frida Repository](https://github.com/frida/frida)
+
+## Contributing
+
+Want to add a new stealth modification? See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+
+- How the repository and branches are organized
+- Complete workflow for creating and applying patches
+- Helper scripts in `tools/` for maintaining patches across versions
