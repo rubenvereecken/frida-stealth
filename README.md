@@ -27,16 +27,15 @@ git clone --recurse-submodules https://github.com/rubenvereecken/frida.git
 cd frida
 ```
 
-**Initialize submodules:**
-
-```bash
-git submodule update --init --recursive
-```
-
 **Optional:** If you need a specific Frida version, checkout the corresponding branch before building:
 
 ```bash
-git checkout stealth/17.3.2
+git checkout stealth/17.3.2 # Optional! By default you're on stealth/main which tracks frida main
+```
+
+**Initialize submodules:**
+
+```bash
 git submodule update --init --recursive
 ```
 
