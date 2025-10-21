@@ -2,7 +2,9 @@
 
 A maintained fork of [Frida](https://frida.re/) with stealth patches applied to evade common detection methods.
 
-**Inspiration & Credits:** This project builds upon the excellent work from [AsenOsen/frida-stealth](https://github.com/AsenOsen/frida-stealth) and [JsHookApp/Frida-Patchs](https://github.com/JsHookApp/Frida-Patchs).
+**Inspiration & Credits:** This project builds upon the excellent work from [AsenOsen/frida-stealth](https://github.com/AsenOsen/frida-stealth) (supports up to Frida v16) and [JsHookApp/Frida-Patchs](https://github.com/JsHookApp/Frida-Patchs).
+
+This fork maintains support for Frida v17+.
 
 ## What does it do?
 
@@ -61,34 +63,14 @@ Binaries will be in `build/frida-android-arm64/`.
 
 ### Option 2: Manual Patching (For Maintainers)
 
-If you're maintaining your own Frida fork and want to apply these patches manually:
-
-**Apply patches to frida-core:**
+If you're maintaining your own Frida fork, apply patches manually:
 
 ```bash
-cd subprojects/frida-core
-git apply /path/to/frida-stealth/subprojects/frida-core/patches/*.patch
+git -C subprojects/frida-core apply /path/to/frida-stealth/subprojects/frida-core/patches/*.patch
+git -C subprojects/frida-gum apply /path/to/frida-stealth/subprojects/frida-gum/patches/*.patch
 ```
 
-**Apply patches to frida-gum:**
-
-```bash
-cd subprojects/frida-gum
-git apply /path/to/frida-stealth/subprojects/frida-gum/patches/*.patch
-```
-
-Note: Patches are maintained for each Frida version. Use patches from the corresponding `stealth/X.Y.Z` branch.
-
-After applying patches, build Frida normally following [official build instructions](https://frida.re/docs/building/).
-
-## Additional Stealth Techniques
-
-For Android, consider these complementary approaches:
-
-1. **[ZygiskFrida](https://github.com/lico-n/ZygiskFrida)** - Inject via Zygisk to avoid ptrace detection
-   - Use with [Kitsune Magisk](https://github.com/HuskyDG/magisk-files) (not regular Magisk)
-2. **[AntiFrida Bypass Scripts](https://github.com/apkunpacker/AntiFrida_Bypass)** - Runtime memory obfuscation
-3. **[Framework Patching](https://github.com/AsenOsen/android-framework-jar-patching)** - System library injection
+Use patches from the corresponding `stealth/X.Y.Z` branch for version-specific patches. Then build normally per [official docs](https://frida.re/docs/building/).
 
 ## Building from Source (Platform-Specific)
 
@@ -111,11 +93,14 @@ Install required Python packages:
 pip install colorama prompt-toolkit pygments
 ```
 
-## Learn More
+## Additional Stealth Techniques
 
-- [Official Frida Documentation](https://frida.re/docs/home/)
-- [Building Frida](https://frida.re/docs/building/)
-- [Original Frida Repository](https://github.com/frida/frida)
+For Android, consider these complementary approaches:
+
+1. **[ZygiskFrida](https://github.com/lico-n/ZygiskFrida)** - Inject via Zygisk to avoid ptrace detection
+   - Use with [Kitsune Magisk](https://github.com/HuskyDG/magisk-files) (not regular Magisk)
+2. **[AntiFrida Bypass Scripts](https://github.com/apkunpacker/AntiFrida_Bypass)** - Runtime memory obfuscation
+3. **[Framework Patching](https://github.com/AsenOsen/android-framework-jar-patching)** - System library injection
 
 ## Contributing
 
