@@ -1,10 +1,10 @@
 # Frida Stealth
 
-A maintained fork of [Frida](https://frida.re/) with stealth patches applied to evade common detection methods.
+A maintained 1:1 mirror of [Frida](https://frida.re/) with stealth patches applied to evade common detection methods. Patches also available separately.
 
 **Inspiration & Credits:** This project builds upon the excellent work from [AsenOsen/frida-stealth](https://github.com/AsenOsen/frida-stealth) (supports up to Frida v16) and [JsHookApp/Frida-Patchs](https://github.com/JsHookApp/Frida-Patchs).
 
-This fork maintains support for Frida v17+.
+Supports Frida v17+.
 
 ## What does it do?
 
@@ -35,6 +35,14 @@ cd frida
 git checkout stealth/17.3.2 # Optional! By default you're on stealth/main which tracks frida main
 ```
 
+Some available versions (latest per major + minor):
+
+- `stealth/17.4.0` - Latest 17.4.x
+- `stealth/17.3.2` - Latest 17.3.x
+- `stealth/17.2.17` - Latest 17.2.x
+- `stealth/17.1.5` - Latest 17.1.x
+- `stealth/17.0.7` - Latest 17.0.x
+
 **Initialize submodules:**
 
 ```bash
@@ -42,24 +50,6 @@ git submodule update --init --recursive
 ```
 
 Then build Frida as normal. For detailed build instructions, see the [official Frida documentation](https://frida.re/docs/building/).
-
-#### Quick build examples
-
-**Python bindings:**
-
-```bash
-make python-macos  # or python-linux, python-windows
-pip install subprojects/frida-python
-```
-
-**Android (arm64):**
-
-```bash
-export ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/25.2.9519653"
-make core-android-arm64
-```
-
-Binaries will be in `build/frida-android-arm64/`.
 
 ### Option 2: Manual Patching (For Maintainers)
 
@@ -69,6 +59,11 @@ If you're maintaining your own Frida fork, apply patches manually:
 git -C subprojects/frida-core apply /path/to/frida-stealth/subprojects/frida-core/patches/*.patch
 git -C subprojects/frida-gum apply /path/to/frida-stealth/subprojects/frida-gum/patches/*.patch
 ```
+
+Patches available:
+
+- [frida-core patches](https://github.com/rubenvereecken/frida-core-stealth/tree/stealth/main/patches)
+- [frida-gum patches](https://github.com/rubenvereecken/frida-gum-stealth/tree/stealth/main/patches)
 
 Use patches from the corresponding `stealth/X.Y.Z` branch for version-specific patches. Then build normally per [official docs](https://frida.re/docs/building/).
 
