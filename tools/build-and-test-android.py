@@ -1,64 +1,52 @@
 #!/usr/bin/env python3
 
-import os
 import shutil
 import subprocess
 import sys
-import time
+import tempfile
 from pathlib import Path
 
 SOURCE_ROOT = Path(__file__).resolve().parent.parent
+BUILD_AND_INSTALL = SOURCE_ROOT / "tools" / "build-and-install-android.py"
 
 
 def main(argv: list[str]):
-    """Build Frida for Android ARM64 and test on a connected device."""
+    """Build, install, and thoroughly test Frida on Android ARM64."""
 
     print("=== Frida Android ARM64 Build & Test ===\n", flush=True)
 
-    # Check prerequisites and get device
-    device_id = check_prerequisites()
-    if not device_id:
+    # Check prerequisites
+    if not check_prerequisites():
         sys.exit(1)
 
-    # Create build directory
-    build_dir = SOURCE_ROOT / "build-android-test"
-    if build_dir.exists():
-        print(f"Removing existing build directory: {build_dir}", flush=True)
-        shutil.rmtree(build_dir)
+    # Get git hash for naming
+    git_hash = get_git_hash()
+    print(f"Git hash: {git_hash}\n", flush=True)
 
-    build_dir.mkdir()
-    print(f"Created build directory: {build_dir}\n", flush=True)
+    # Build directory for testing
+    build_dir = SOURCE_ROOT / "build-android-test"
 
     try:
-        # Configure
-        print("Configuring Frida for Android ARM64...", flush=True)
-        configure_script = SOURCE_ROOT / "configure"
-        run([str(configure_script), "--host=android-arm64"], cwd=build_dir)
-        print("Configuration complete.\n", flush=True)
+        # Build and install using the build-and-install script
+        print("Building and installing Frida...\n", flush=True)
+        run(
+            [
+                sys.executable,
+                str(BUILD_AND_INSTALL),
+                "--name",
+                f"frida-server-{git_hash}",
+                "--build-dir",
+                str(build_dir),
+                "--keep-build",  # We'll clean up ourselves after tests pass
+            ]
+        )
 
-        # Build
-        print("Building Frida (this may take a while)...", flush=True)
-        run(["make"], cwd=build_dir)
-        print("Build complete.\n", flush=True)
+        print("\n" + "=" * 60, flush=True)
+        print("=== Running Tests ===", flush=True)
+        print("=" * 60 + "\n", flush=True)
 
-        # Get git hash for naming
-        git_hash = get_git_hash()
-        print(f"Git hash: {git_hash}\n", flush=True)
-
-        # Find frida-server binary
-        frida_server = find_frida_server(build_dir)
-        if not frida_server:
-            print(
-                "ERROR: Could not find frida-server binary in build directory",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-        print(f"Found frida-server: {frida_server}\n", flush=True)
-
-        # Deploy and test
-        remote_path = f"/data/local/tmp/frida-server-{git_hash}"
-        deploy_and_test(frida_server, remote_path, device_id)
+        # Run tests
+        run_tests()
 
         # Success - clean up
         print("\n=== All tests passed! ===", flush=True)
@@ -83,59 +71,26 @@ def main(argv: list[str]):
         sys.exit(1)
 
 
-def check_prerequisites() -> str | None:
-    """Check that all required tools and environment variables are available.
-    Returns the device ID to use, or None on failure."""
-
-    # Check ANDROID_NDK_ROOT
-    ndk_root = os.environ.get("ANDROID_NDK_ROOT")
-    if not ndk_root:
-        print(
-            "ERROR: ANDROID_NDK_ROOT environment variable is not set", file=sys.stderr
-        )
-        print("Please set it to your Android NDK installation path", file=sys.stderr)
-        return None
-
-    ndk_path = Path(ndk_root)
-    if not ndk_path.exists():
-        print(
-            f"ERROR: ANDROID_NDK_ROOT points to non-existent path: {ndk_root}",
-            file=sys.stderr,
-        )
-        return None
-
-    print(f"✓ ANDROID_NDK_ROOT: {ndk_root}", flush=True)
-
-    # Check for adb
-    if not shutil.which("adb"):
-        print("ERROR: adb not found in PATH", file=sys.stderr)
-        print("Please install Android SDK platform-tools", file=sys.stderr)
-        return None
-
-    print("✓ adb found", flush=True)
-
-    # Check for connected device
-    result = run(["adb", "devices"], capture_output=True)
-    devices = [line for line in result.stdout.strip().split("\n")[1:] if line.strip()]
-
-    if not devices:
-        print("ERROR: No Android devices connected", file=sys.stderr)
-        print("Please connect a device and enable USB debugging", file=sys.stderr)
-        return None
-
-    # Extract device ID from first device (format: "device_id    device")
-    device_id = devices[0].split()[0]
-    print(f"✓ Using device: {device_id}", flush=True)
+def check_prerequisites() -> bool:
+    """Check that testing tools are available."""
 
     # Check for frida-ps
     if not shutil.which("frida-ps"):
-        print("WARNING: frida-ps not found in PATH", file=sys.stderr)
-        print("Testing will be limited without frida CLI tools", file=sys.stderr)
-        return None
+        print("ERROR: frida-ps not found in PATH", file=sys.stderr)
+        print("Please install frida-tools: pip install frida-tools", file=sys.stderr)
+        return False
 
-    print("✓ frida-ps found\n", flush=True)
+    print("✓ frida-ps found", flush=True)
 
-    return device_id
+    # Check for frida (Python module)
+    if not shutil.which("frida"):
+        print("ERROR: frida CLI not found in PATH", file=sys.stderr)
+        print("Please install frida-tools: pip install frida-tools", file=sys.stderr)
+        return False
+
+    print("✓ frida CLI found\n", flush=True)
+
+    return True
 
 
 def get_git_hash() -> str:
@@ -146,58 +101,11 @@ def get_git_hash() -> str:
     return result.stdout.strip()
 
 
-def find_frida_server(build_dir: Path) -> Path | None:
-    # Common paths where frida-server might be located
-    patterns = [
-        "subprojects/frida-core/server/frida-server",
-        "build/subprojects/frida-core/server/frida-server",
-        "**/frida-server",
-    ]
+def run_tests():
+    """Run comprehensive tests on the deployed Frida server."""
 
-    for pattern in patterns:
-        matches = list(build_dir.glob(pattern))
-        if matches:
-            # Return the first match that's actually a file
-            for match in matches:
-                if match.is_file():
-                    return match
-
-    return None
-
-
-def deploy_and_test(frida_server: Path, remote_path: str, device_id: str):
-    print("Deploying frida-server to device...", flush=True)
-
-    # Push to device
-    run(["adb", "-s", device_id, "push", str(frida_server), remote_path])
-    print(f"✓ Pushed to {remote_path}", flush=True)
-
-    # Make executable
-    run(["adb", "-s", device_id, "shell", "chmod", "755", remote_path])
-    print("✓ Made executable", flush=True)
-
-    # Kill any existing frida-server instances
-    print("\nStopping any existing frida-server instances...", flush=True)
-    run(["adb", "-s", device_id, "shell", "killall", "-9", "frida-server"], check=False)
-    time.sleep(1)
-
-    # Start frida-server with nohup
-    print("Starting frida-server...", flush=True)
-    # Using nohup and redirecting to /dev/null, running in background
-    run(["adb", "-s", device_id, "shell", f"nohup {remote_path} > /dev/null 2>&1 &"])
-
-    # Give it a moment to start
-    time.sleep(2)
-
-    # Verify it's running
-    result = run(["adb", "-s", device_id, "shell", "ps", "-A"], capture_output=True)
-    if "frida-server" not in result.stdout:
-        raise Exception("frida-server does not appear to be running")
-
-    print("✓ frida-server is running\n", flush=True)
-
-    # Test with frida-ps
-    print("Testing with frida-ps -U...", flush=True)
+    # Test 1: frida-ps
+    print("Test 1: Listing processes with frida-ps...", flush=True)
     result = run(["frida-ps", "-U"], capture_output=True, timeout=10)
 
     lines = result.stdout.strip().split("\n")
@@ -211,6 +119,127 @@ def deploy_and_test(frida_server: Path, remote_path: str, device_id: str):
 
     if len(lines) > 11:
         print(f"  ... and {len(lines) - 11} more")
+
+    # Test 2: Inject and run a script
+    print("\n\nTest 2: Injecting 'Hello World' script into Settings app...", flush=True)
+    inject_hello_world()
+
+
+def inject_hello_world():
+    """Inject a simple hello world script into the Settings app."""
+
+    # Create a temporary script file
+    script_code = """
+console.log("\\n" + "=".repeat(50));
+console.log("FRIDA INJECTION TEST");
+console.log("Hello World from Frida!");
+console.log("Process: " + Process.id + " - " + Process.getCurrentThreadId());
+console.log("=".repeat(50) + "\\n");
+"""
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".js", delete=False) as f:
+        f.write(script_code)
+        script_path = f.name
+
+    try:
+        # Try to inject into Settings app (common system app)
+        target_apps = [
+            "com.android.settings",
+            "android.settings",
+            "system_server",
+        ]
+
+        for app in target_apps:
+            print(f"  Trying target: {app}", flush=True)
+            try:
+                result = run(
+                    ["frida", "-U", "-l", script_path, "-f", app, "--no-pause"],
+                    capture_output=True,
+                    timeout=15,
+                    check=False,
+                )
+
+                # Check if we got our expected output
+                if "FRIDA INJECTION TEST" in result.stdout:
+                    print(f"✓ Successfully injected into {app}", flush=True)
+                    print("\nInjection output:")
+                    # Print the relevant part of the output
+                    for line in result.stdout.split("\n"):
+                        if any(
+                            marker in line
+                            for marker in [
+                                "FRIDA INJECTION TEST",
+                                "Hello World",
+                                "Process:",
+                                "===",
+                            ]
+                        ):
+                            print(f"  {line}")
+                    return
+
+            except subprocess.TimeoutExpired:
+                print(f"  Timeout waiting for {app}", flush=True)
+                continue
+            except Exception as e:
+                print(f"  Failed to inject into {app}: {e}", flush=True)
+                continue
+
+        # If we get here, none of the targets worked - try a simpler approach
+        print("\n  Falling back to process list injection test...", flush=True)
+
+        # Get a running process to inject into
+        ps_result = run(["frida-ps", "-U"], capture_output=True)
+        lines = ps_result.stdout.strip().split("\n")[1:]  # Skip header
+
+        for line in lines:
+            parts = line.split()
+            if len(parts) >= 2:
+                pid = parts[0]
+                name = parts[1]
+
+                # Skip certain system processes that might be tricky
+                if name in ["zygote", "zygote64", "init"]:
+                    continue
+
+                try:
+                    print(f"  Trying PID {pid} ({name})", flush=True)
+                    result = run(
+                        ["frida", "-U", "-p", pid, "-l", script_path, "--runtime=v8"],
+                        capture_output=True,
+                        timeout=5,
+                        check=False,
+                    )
+
+                    if (
+                        "Hello World" in result.stdout
+                        or "FRIDA INJECTION TEST" in result.stdout
+                    ):
+                        print(
+                            f"✓ Successfully injected into PID {pid} ({name})",
+                            flush=True,
+                        )
+                        print("\nInjection output:")
+                        for line in result.stdout.split("\n"):
+                            if any(
+                                marker in line
+                                for marker in [
+                                    "FRIDA INJECTION TEST",
+                                    "Hello World",
+                                    "Process:",
+                                    "===",
+                                ]
+                            ):
+                                print(f"  {line}")
+                        return
+
+                except (subprocess.TimeoutExpired, Exception):
+                    continue
+
+        raise Exception("Could not inject test script into any process")
+
+    finally:
+        # Clean up temp file
+        Path(script_path).unlink(missing_ok=True)
 
 
 def run(
