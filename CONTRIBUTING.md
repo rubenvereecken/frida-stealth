@@ -83,20 +83,15 @@ All scripts are in `tools/` and designed to be run from the top-level frida dire
 | Script                        | Purpose                                                    |
 | ----------------------------- | ---------------------------------------------------------- |
 | `create-version-branches.py`  | Create `stealth/X.Y.Z` branches for all versions >= 17.0.0 |
-| `apply-commit-to-branches.py` | Cherry-pick a commit onto all version branches             |
-| `generate-patch.py`           | Generate a `.patch` file from a commit                     |
-| `commit-and-tag-patch.py`     | Commit and tag a generated patch file                      |
+| `rebuild-branches.py`         | Rebuild all version branches from stealth/main commits     |
 | `update-submodule-refs.py`    | Update parent repo's submodule pointers                    |
+| `generate-patch.py`           | Generate a `.patch` file from a commit (manual use)        |
 
 ## Complete Development Workflow
 
-This is the end-to-end process for adding a new stealth modification.
+This is the streamlined process for adding a new stealth modification.
 
-### Prerequisites
-
-Ensure you're in the top-level frida directory and have all submodules initialized.
-
-### Step 1: Make Your Changes
+### Step 1: Make Your Changes on stealth/main
 
 Work on the `stealth/main` branch of the relevant submodule:
 
@@ -112,133 +107,84 @@ git add lib/agent/agent.vala
 git commit -m "Obfuscate thread names to avoid detection"
 ```
 
-Note the commit hash (e.g., `37ca12d8`).
+**For frida-gum:** Same process in `subprojects/frida-gum`
 
-### Step 2: Apply to All Version Branches
+### Step 2: Generate Patch File and Update README
 
-Use the helper script to cherry-pick your commit onto all `stealth/*` version branches:
+In a **separate commit**, generate the patch file and update the patches README:
+
+```bash
+# Generate patch from your previous commit
+git format-patch -1 HEAD --stdout > patches/002-obfuscate-rpc.patch
+
+# Update patches/README.md to add a row for your new patch
+vim patches/README.md
+
+# Commit both together
+git add patches/002-obfuscate-rpc.patch patches/README.md
+git commit -m "Add patch 002: RPC protocol obfuscation"
+```
+
+**Why separate commits?**
+- First commit: Your actual code changes (clean, reviewable)
+- Second commit: Generated artifacts (patch file + documentation)
+
+### Step 3: Rebuild All Version Branches
+
+From the top-level frida directory, rebuild all version branches with your new commits:
 
 ```bash
 cd /path/to/frida  # Top-level directory
-./tools/apply-commit-to-branches.py frida-core 37ca12d8
-```
-
-This will:
-
-- Iterate through all 36+ version branches
-- Cherry-pick the commit onto each
-- Stop immediately if conflicts occur (for manual resolution)
-- Restore your original branch when done
-
-**For frida-gum:**
-
-```bash
-./tools/apply-commit-to-branches.py frida-gum abc123
-```
-
-### Step 3: Generate Patch File
-
-Create a unified `.patch` file from your commit:
-
-```bash
-./tools/generate-patch.py frida-core 37ca12d8 001-obfuscate-threads.patch
-```
-
-This will:
-
-- Generate a diff from `commit~..commit`
-- Verify the patch is identical across all version branches
-- Save to `subprojects/frida-core/patches/001-obfuscate-threads.patch`
-- Warn if any branch has different changes
-
-**Patch naming:**
-
-- Use sequential numbers: `001-`, `002-`, `003-`
-- Keep descriptions short and hyphenated
-- Always end with `.patch`
-
-### Step 4: Commit and Tag the Patch
-
-Commit the patch file to the repository and create a tag:
-
-```bash
-./tools/commit-and-tag-patch.py frida-core 001-obfuscate-threads.patch
+./tools/rebuild-branches.py frida-core
 ```
 
 This automatically:
+- Resets each version branch to its upstream tag
+- Cherry-picks all commits from stealth/main
+- Handles all 35+ branches in one command
 
-- Adds `patches/001-obfuscate-threads.patch`
-- Commits with message: `generated patch 001-obfuscate-threads`
-- Tags as: `stealth-patch/001-obfuscate-threads`
-
-Note the new commit hash (e.g., `80540048`).
-
-### Step 5: Apply Patch Commit to All Branches
-
-Apply the commit that _added the patch file_ to all version branches:
-
+**For frida-gum:**
 ```bash
-./tools/apply-commit-to-branches.py frida-core 80540048
+./tools/rebuild-branches.py frida-gum
 ```
 
-This ensures every version branch has the `.patch` file in its `patches/` directory.
+### Step 4: Update Submodule References
 
-### Step 6: Update Submodule References
-
-Update the top-level `frida` repository to point to the new submodule commits:
+Update the top-level repository to point to the new submodule commits:
 
 ```bash
 ./tools/update-submodule-refs.py
 ```
 
-This will:
+This updates all parent branches to reference the correct submodule commits.
 
-- Go through each `stealth/*` branch in top-level frida
-- Update the submodule pointers to the matching branch commits
-- Commit changes with message: `update submodule refs for stealth/X.Y.Z`
+### Step 5: Push Everything
 
-### Step 7: Push Everything
-
-Push all changes to your remote repositories:
-
-**Push frida-core branches and tags:**
+**Push frida-core:**
 
 ```bash
 cd subprojects/frida-core
-
-# Push all stealth branches (in order)
-python3 -c "
-import subprocess, re
-result = subprocess.run(['git', 'branch', '--list', 'stealth/*'], capture_output=True, text=True)
-branches = [line.strip().lstrip('* ') for line in result.stdout.strip().split('\n') if line.strip()]
-version_branches = []
-for branch in branches:
-    match = re.match(r'stealth/(\d+)\.(\d+)\.(\d+)$', branch)
-    if match:
-        version_branches.append((int(match.group(1)), int(match.group(2)), int(match.group(3)), branch))
-version_branches.sort()
-for _, _, _, branch in version_branches:
-    subprocess.run(['git', 'push', 'origin', branch])
-subprocess.run(['git', 'push', 'origin', 'stealth/main'])
-"
-
-# Push only stealth-patch tags (not upstream version tags)
-git push origin 'refs/tags/stealth-patch/*'
+git push origin stealth/main
+git branch --list 'stealth/*' | grep -E 'stealth/[0-9]' | xargs -n1 git push origin
 ```
 
-**Push frida-gum branches (if modified):**
+**Push frida-gum (if modified):**
 
 ```bash
 cd subprojects/frida-gum
-# Same push commands as frida-core
+git push origin stealth/main
+git branch --list 'stealth/*' | grep -E 'stealth/[0-9]' | xargs -n1 git push origin
 ```
 
-**Push top-level frida branches:**
+**Push top-level frida:**
 
 ```bash
 cd /path/to/frida  # Top-level
-# Same push commands
+git push origin stealth/main
+git branch --list 'stealth/*' | grep -E 'stealth/[0-9]' | xargs -n1 git push origin
 ```
+
+**Note:** Force push should only be needed if you've rewritten history (amended commits, rebased, etc.). Normal workflow just adds new commits on top.
 
 ## Adding New Upstream Versions
 
@@ -303,51 +249,47 @@ make
 
 ```
 stealth/main (frida-core)
-    ↓ (1. Make changes)
-commit 37ca12d8
-    ↓ (2. apply-commit-to-branches.py)
-stealth/17.0.0...stealth/17.3.2 (35 branches)
-    ↓ (3. generate-patch.py)
-patches/001-name.patch
-    ↓ (4. commit-and-tag-patch.py)
-commit 80540048 [tag: stealth-patch/001-name]
-    ↓ (5. apply-commit-to-branches.py)
-patches/ on all branches
-    ↓ (6. update-submodule-refs.py)
-Top-level frida updated
-    ↓ (7. Push)
+    ↓ (1. Make code changes)
+commit 6b8eadb6 "Obfuscate RPC protocol identifiers"
+    ↓ (2. Generate patch + update README)
+commit 7376e04f "Add patch 002"
+    ↓ (3. rebuild-branches.py frida-core)
+stealth/17.0.0...stealth/17.3.2 (all 35 branches updated)
+    ↓ (4. update-submodule-refs.py)
+Top-level frida updated (all 36 branches)
+    ↓ (5. Push frida-core + parent)
 GitHub ✓
 ```
 
 ## Troubleshooting
 
-### Cherry-pick Conflicts
+### Rebuild Conflicts
 
-If `apply-commit-to-branches.py` fails with conflicts:
+If `rebuild-branches.py` fails with conflicts on a specific version:
 
 1. The script reports which branch failed (e.g., `stealth/17.2.3`)
 2. Manually resolve:
    ```bash
    cd subprojects/frida-core
    git checkout stealth/17.2.3
-   git cherry-pick <commit>
+   git cherry-pick <commit-hash>
    # Resolve conflicts
    git cherry-pick --continue
    ```
-3. Re-run the script - it skips already-applied branches
+3. Continue with remaining steps manually
 
-### Patch Doesn't Apply to All Versions
+### Changes Don't Work on Older Versions
 
-If `generate-patch.py` warns about different changes:
+If your changes break on older Frida versions:
 
-- Some file might not exist in older versions
+- Some files/APIs might not exist in older versions
 - Code structure might be different
 
 Options:
 
-- Create version-specific patches: `001-name.17.2.1.patch`
-- Document unsupported versions in patch comments
-- Modify your changes to work across all versions
+- Modify changes to work across all versions (preferred)
+- Document version requirements in patch comments
+- Create version-specific patches: `002-name.17.2.x.patch`
 
 ### Submodule Pointer Not Updated
 

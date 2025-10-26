@@ -223,7 +223,9 @@ def rebuild_all_branches(repo_dir: Path, repo_name: str, dry_run: bool = False):
 
         if fail_count == 0:
             print("\n⚠️  Branches rebuilt locally. Push with:")
-            print(f"   git push origin 'stealth/*' --force")
+            print(f"   cd subprojects/{repo_name}")
+            print(f"   git push origin stealth/main")
+            print(f"   git branch --list 'stealth/*' | grep -E 'stealth/[0-9]' | xargs -n1 git push origin")
 
     finally:
         # Always restore original branch

@@ -126,6 +126,11 @@ def main():
 
         print(f"\n✓ Updated: {updated_count}, Skipped: {skipped_count}")
 
+        if updated_count > 0:
+            print("\n⚠️  Submodule refs updated locally. Push with:")
+            print(f"   git push origin stealth/main")
+            print(f"   git branch --list 'stealth/*' | grep -E 'stealth/[0-9]' | xargs -n1 git push origin")
+
     finally:
         # Always restore original branch
         print(f"\nRestoring original branch: {original_branch}")
