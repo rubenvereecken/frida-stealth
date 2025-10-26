@@ -48,9 +48,8 @@ Patches are stored as `.patch` files in the submodule repositories:
 
 Each patch is:
 
-1. Generated from actual commits on the stealth branches
+1. Generated from actual commits on the stealth branches using `generate-patch.py`
 2. Committed to the repository with message: `generated patch 00X-description`
-3. Tagged as: `stealth-patch/00X-description`
 
 ## Key Concepts
 
@@ -80,12 +79,12 @@ The helper scripts automate this process.
 
 All scripts are in `tools/` and designed to be run from the top-level frida directory:
 
-| Script                       | Purpose                                                    |
-| ---------------------------- | ---------------------------------------------------------- |
-| `create-version-branches.py` | Create `stealth/X.Y.Z` branches for all versions >= 17.0.0 |
-| `rebuild-branches.py`        | Rebuild all version branches from stealth/main commits     |
-| `update-submodule-refs.py`   | Update parent repo's submodule pointers                    |
-| `generate-patch.py`          | Generate a `.patch` file from a commit (manual use)        |
+| Script                       | Purpose                                                                      |
+| ---------------------------- | ---------------------------------------------------------------------------- |
+| `create-version-branches.py` | Create `stealth/X.Y.Z` branches for all versions >= 17.0.0                   |
+| `generate-patch.py`          | Generate a `.patch` file from a commit and verify it applies to all branches |
+| `rebuild-branches.py`        | Rebuild all version branches from stealth/main commits                       |
+| `update-submodule-refs.py`   | Update parent repo's submodule pointers                                      |
 
 ## Complete Development Workflow
 
@@ -122,28 +121,40 @@ git commit -m "Obfuscate thread names to avoid detection"
 
 **For frida-gum:** Same process in `subprojects/frida-gum`
 
-### Step 2: Generate Patch File and Update README
+### Step 2: Generate Patch File
 
-In a **separate commit**, generate the patch file and update the patches README:
+Back at the top-level directory, generate the patch file from your commit:
 
 ```bash
-# Generate patch from your previous commit
-git format-patch -1 HEAD --stdout > patches/002-obfuscate-rpc.patch
+cd /path/to/frida  # Top-level directory
+./tools/generate-patch.py frida-core <commit-hash> 00X-short-description.patch
+```
+
+This generates `subprojects/frida-core/patches/00X-short-description.patch` and verifies it applies to all version branches.
+
+### Step 3: Commit Patch File and Update README
+
+Now commit the generated patch along with an updated README:
+
+```bash
+cd subprojects/frida-core
 
 # Update patches/README.md to add a row for your new patch
 vim patches/README.md
 
-# Commit both together
-git add patches/002-obfuscate-rpc.patch patches/README.md
-git commit -m "Add patch 002: RPC protocol obfuscation"
+# Commit both together with the standard format
+git add patches/00X-short-description.patch patches/README.md
+git commit -m "generated patch 00X-short-description"
 ```
+
+**Commit message format:** Always use `"generated patch 00X-short-description"` (no caps, just the patch ID)
 
 **Why separate commits?**
 
 - First commit: Your actual code changes (clean, reviewable)
 - Second commit: Generated artifacts (patch file + documentation)
 
-### Step 3: Rebuild All Version Branches
+### Step 4: Rebuild All Version Branches
 
 From the top-level frida directory, rebuild all version branches with your new commits:
 
@@ -164,7 +175,7 @@ This automatically:
 ./tools/rebuild-branches.py frida-gum
 ```
 
-### Step 4: Update Submodule References
+### Step 5: Update Submodule References
 
 Update the top-level repository to point to the new submodule commits:
 
@@ -174,7 +185,7 @@ Update the top-level repository to point to the new submodule commits:
 
 This updates all parent branches to reference the correct submodule commits.
 
-### Step 5: Push Everything
+### Step 6: Push Everything
 
 **IMPORTANT:** After rebuilding branches and updating submodule refs, you must push all branches to the remote. This ensures users get the latest stealth patches.
 
@@ -262,22 +273,24 @@ cd /path/to/frida
 # Test build the new version
 make
 
-# Push everything (see Step 7 above)
+# Push everything (see Step 6 above)
 ```
 
 ## Workflow Summary Diagram
 
 ```
 stealth/main (frida-core)
-    ↓ (1. Make code changes)
+    ↓ (1. Make code changes + commit)
 commit 6b8eadb6 "Obfuscate RPC protocol identifiers"
-    ↓ (2. Generate patch + update README)
-commit 7376e04f "Add patch 002"
-    ↓ (3. rebuild-branches.py frida-core)
+    ↓ (2. generate-patch.py)
+patches/002-obfuscate-rpc.patch generated
+    ↓ (3. Commit patch + README update)
+commit 7376e04f "generated patch 002-obfuscate-rpc"
+    ↓ (4. rebuild-branches.py frida-core)
 stealth/17.0.0...stealth/17.3.2 (all 35 branches updated)
-    ↓ (4. update-submodule-refs.py)
+    ↓ (5. update-submodule-refs.py)
 Top-level frida updated (all 36 branches)
-    ↓ (5. Push frida-core + parent)
+    ↓ (6. Push frida-core + parent)
 GitHub ✓
 ```
 
