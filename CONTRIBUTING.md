@@ -80,12 +80,12 @@ The helper scripts automate this process.
 
 All scripts are in `tools/` and designed to be run from the top-level frida directory:
 
-| Script                        | Purpose                                                    |
-| ----------------------------- | ---------------------------------------------------------- |
-| `create-version-branches.py`  | Create `stealth/X.Y.Z` branches for all versions >= 17.0.0 |
-| `rebuild-branches.py`         | Rebuild all version branches from stealth/main commits     |
-| `update-submodule-refs.py`    | Update parent repo's submodule pointers                    |
-| `generate-patch.py`           | Generate a `.patch` file from a commit (manual use)        |
+| Script                       | Purpose                                                    |
+| ---------------------------- | ---------------------------------------------------------- |
+| `create-version-branches.py` | Create `stealth/X.Y.Z` branches for all versions >= 17.0.0 |
+| `rebuild-branches.py`        | Rebuild all version branches from stealth/main commits     |
+| `update-submodule-refs.py`   | Update parent repo's submodule pointers                    |
+| `generate-patch.py`          | Generate a `.patch` file from a commit (manual use)        |
 
 ## Complete Development Workflow
 
@@ -101,8 +101,21 @@ git checkout stealth/main
 
 # Make your changes
 vim lib/agent/agent.vala
+```
 
-# Commit with a descriptive message
+**IMPORTANT: Test before committing!**
+
+Before committing your changes, you MUST run the test script to ensure your changes work:
+
+```bash
+cd /path/to/frida  # Top-level directory
+./tools/build-and-test-android.py
+```
+
+This builds Frida for Android ARM64 and tests on a connected device. Only commit if tests pass!
+
+```bash
+cd subprojects/frida-core
 git add lib/agent/agent.vala
 git commit -m "Obfuscate thread names to avoid detection"
 ```
@@ -126,6 +139,7 @@ git commit -m "Add patch 002: RPC protocol obfuscation"
 ```
 
 **Why separate commits?**
+
 - First commit: Your actual code changes (clean, reviewable)
 - Second commit: Generated artifacts (patch file + documentation)
 
@@ -139,11 +153,13 @@ cd /path/to/frida  # Top-level directory
 ```
 
 This automatically:
+
 - Resets each version branch to its upstream tag
 - Cherry-picks all commits from stealth/main
 - Handles all 35+ branches in one command
 
 **For frida-gum:**
+
 ```bash
 ./tools/rebuild-branches.py frida-gum
 ```
@@ -160,11 +176,17 @@ This updates all parent branches to reference the correct submodule commits.
 
 ### Step 5: Push Everything
 
+**IMPORTANT:** After rebuilding branches and updating submodule refs, you must push all branches to the remote. This ensures users get the latest stealth patches.
+
 **Push frida-core:**
 
 ```bash
 cd subprojects/frida-core
+
+# Push stealth/main
 git push origin stealth/main
+
+# Push all version branches
 git branch --list 'stealth/*' | grep -E 'stealth/[0-9]' | xargs -n1 git push origin
 ```
 
@@ -183,8 +205,6 @@ cd /path/to/frida  # Top-level
 git push origin stealth/main
 git branch --list 'stealth/*' | grep -E 'stealth/[0-9]' | xargs -n1 git push origin
 ```
-
-**Note:** Force push should only be needed if you've rewritten history (amended commits, rebased, etc.). Normal workflow just adds new commits on top.
 
 ## Adding New Upstream Versions
 
