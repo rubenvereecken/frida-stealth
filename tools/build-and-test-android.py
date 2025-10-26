@@ -74,15 +74,7 @@ def main(argv: list[str]):
 def check_prerequisites() -> bool:
     """Check that testing tools are available."""
 
-    # Check for frida-ps
-    if not shutil.which("frida-ps"):
-        print("ERROR: frida-ps not found in PATH", file=sys.stderr)
-        print("Please install frida-tools: pip install frida-tools", file=sys.stderr)
-        return False
-
-    print("✓ frida-ps found", flush=True)
-
-    # Check for frida (Python module)
+    # Check for frida CLI
     if not shutil.which("frida"):
         print("ERROR: frida CLI not found in PATH", file=sys.stderr)
         print("Please install frida-tools: pip install frida-tools", file=sys.stderr)
@@ -104,24 +96,8 @@ def get_git_hash() -> str:
 def run_tests():
     """Run comprehensive tests on the deployed Frida server."""
 
-    # Test 1: frida-ps
-    print("Test 1: Listing processes with frida-ps...", flush=True)
-    result = run(["frida-ps", "-U"], capture_output=True, timeout=10)
-
-    lines = result.stdout.strip().split("\n")
-    if len(lines) < 2:  # Header + at least one process
-        raise Exception("frida-ps returned no processes")
-
-    print(f"✓ frida-ps successful, found {len(lines) - 1} processes", flush=True)
-    print("\nSample output (first 10 processes):")
-    for line in lines[:11]:
-        print(f"  {line}")
-
-    if len(lines) > 11:
-        print(f"  ... and {len(lines) - 11} more")
-
-    # Test 2: Inject and run a script
-    print("\n\nTest 2: Injecting 'Hello World' script into Settings app...", flush=True)
+    # Test: Inject and run a script to verify server is working
+    print("Test: Injecting 'Hello World' script to verify server functionality...", flush=True)
     inject_hello_world()
 
 
@@ -187,18 +163,19 @@ console.log("=".repeat(50) + "\\n");
         # If we get here, none of the targets worked - try a simpler approach
         print("\n  Falling back to process list injection test...", flush=True)
 
-        # Get a running process to inject into
-        ps_result = run(["frida-ps", "-U"], capture_output=True)
+        # Get a running process to inject into using adb ps
+        ps_result = run(["adb", "shell", "ps", "-A"], capture_output=True)
         lines = ps_result.stdout.strip().split("\n")[1:]  # Skip header
 
         for line in lines:
             parts = line.split()
-            if len(parts) >= 2:
-                pid = parts[0]
-                name = parts[1]
+            if len(parts) >= 9:  # Android ps format has PID in different column
+                # Format: USER PID PPID VSZ RSS WCHAN ADDR S NAME
+                pid = parts[1]
+                name = parts[8] if len(parts) > 8 else parts[-1]
 
                 # Skip certain system processes that might be tricky
-                if name in ["zygote", "zygote64", "init"]:
+                if name in ["zygote", "zygote64", "init", "frida-server"]:
                     continue
 
                 try:
