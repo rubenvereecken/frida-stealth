@@ -63,8 +63,9 @@ def main(argv: list[str]):
         print("Configuration complete.\n", flush=True)
 
         # Build
-        print("Building Frida (this may take a while)...", flush=True)
-        run(["make"], cwd=build_dir)
+        cpu_count = os.cpu_count() or 4
+        print(f"Building Frida using {cpu_count} parallel jobs...", flush=True)
+        run(["make", f"-j{cpu_count}"], cwd=build_dir)
         print("Build complete.\n", flush=True)
 
         # Find frida-server binary
