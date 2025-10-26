@@ -14,9 +14,11 @@ These patches modify Frida to avoid common detection patterns:
 - Renamed internal loops and data structures
 - Modified default port numbers
 - Anonymized unix socket names
-- Cleaned SELinux context names
 
-For additional Android-specific stealth techniques, see [AsenOsen's framework patching approach](https://github.com/AsenOsen/android-framework-jar-patching).
+To see all patches:
+
+- [frida-core patches](https://github.com/rubenvereecken/frida-core-stealth/tree/stealth/main/patches)
+- [frida-gum patches](https://github.com/rubenvereecken/frida-gum-stealth/tree/stealth/main/patches)
 
 ## Getting Started
 
@@ -60,33 +62,7 @@ git -C subprojects/frida-core apply /path/to/frida-stealth/subprojects/frida-cor
 git -C subprojects/frida-gum apply /path/to/frida-stealth/subprojects/frida-gum/patches/*.patch
 ```
 
-Patches available:
-
-- [frida-core patches](https://github.com/rubenvereecken/frida-core-stealth/tree/stealth/main/patches)
-- [frida-gum patches](https://github.com/rubenvereecken/frida-gum-stealth/tree/stealth/main/patches)
-
 Use patches from the corresponding `stealth/X.Y.Z` branch for version-specific patches. Then build normally per [official docs](https://frida.re/docs/building/).
-
-## Building from Source (Platform-Specific)
-
-### Apple Platforms
-
-Create a code-signing certificate first (see [GDB's guide](https://sourceware.org/gdb/wiki/PermissionsDarwin)):
-
-```bash
-export MACOS_CERTID=frida-cert
-export IOS_CERTID=frida-cert
-make
-sudo killall taskgated  # Restart taskgated to accept new cert
-```
-
-### CLI Tools
-
-Install required Python packages:
-
-```bash
-pip install colorama prompt-toolkit pygments
-```
 
 ## Additional Stealth Techniques
 
