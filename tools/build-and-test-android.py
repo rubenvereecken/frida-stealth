@@ -97,12 +97,15 @@ def run_tests():
     """Run comprehensive tests on the deployed Frida server."""
 
     # Test: Inject and run a script to verify server is working
-    print("Test: Injecting 'Hello World' script to verify server functionality...", flush=True)
+    print(
+        "Test: Injecting 'Hello World' script to verify server functionality...",
+        flush=True,
+    )
     inject_hello_world()
 
 
 def inject_hello_world():
-    """Inject a simple hello world script into the Settings app."""
+    """Inject a simple hello world script into Settings or Play Store."""
 
     # Create a temporary script file
     script_code = """
@@ -118,11 +121,10 @@ console.log("=".repeat(50) + "\\n");
         script_path = f.name
 
     try:
-        # Try to inject into Settings app (common system app)
+        # Try Settings and Play Store - most reliable targets
         target_apps = [
             "com.android.settings",
-            "android.settings",
-            "system_server",
+            "com.android.vending",
         ]
 
         for app in target_apps:
@@ -160,59 +162,10 @@ console.log("=".repeat(50) + "\\n");
                 print(f"  Failed to inject into {app}: {e}", flush=True)
                 continue
 
-        # If we get here, none of the targets worked - try a simpler approach
-        print("\n  Falling back to process list injection test...", flush=True)
-
-        # Get a running process to inject into using adb ps
-        ps_result = run(["adb", "shell", "ps", "-A"], capture_output=True)
-        lines = ps_result.stdout.strip().split("\n")[1:]  # Skip header
-
-        for line in lines:
-            parts = line.split()
-            if len(parts) >= 9:  # Android ps format has PID in different column
-                # Format: USER PID PPID VSZ RSS WCHAN ADDR S NAME
-                pid = parts[1]
-                name = parts[8] if len(parts) > 8 else parts[-1]
-
-                # Skip certain system processes that might be tricky
-                if name in ["zygote", "zygote64", "init", "frida-server"]:
-                    continue
-
-                try:
-                    print(f"  Trying PID {pid} ({name})", flush=True)
-                    result = run(
-                        ["frida", "-U", "-p", pid, "-l", script_path, "--runtime=v8"],
-                        capture_output=True,
-                        timeout=5,
-                        check=False,
-                    )
-
-                    if (
-                        "Hello World" in result.stdout
-                        or "FRIDA INJECTION TEST" in result.stdout
-                    ):
-                        print(
-                            f"✓ Successfully injected into PID {pid} ({name})",
-                            flush=True,
-                        )
-                        print("\nInjection output:")
-                        for line in result.stdout.split("\n"):
-                            if any(
-                                marker in line
-                                for marker in [
-                                    "FRIDA INJECTION TEST",
-                                    "Hello World",
-                                    "Process:",
-                                    "===",
-                                ]
-                            ):
-                                print(f"  {line}")
-                        return
-
-                except (subprocess.TimeoutExpired, Exception):
-                    continue
-
-        raise Exception("Could not inject test script into any process")
+        raise Exception(
+            "Could not inject into Settings or Play Store. "
+            "Make sure one of these apps is installed."
+        )
 
     finally:
         # Clean up temp file
