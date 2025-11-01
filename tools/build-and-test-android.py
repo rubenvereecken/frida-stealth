@@ -96,6 +96,11 @@ def get_git_hash() -> str:
 def run_tests():
     """Run comprehensive tests on the deployed Frida server."""
 
+    # Setup port forwarding for stealth server (port 27043)
+    print("Setting up adb port forwarding for stealth server (27043)...", flush=True)
+    run(["adb", "forward", "tcp:27043", "tcp:27043"])
+    print("✓ Port forwarding configured\n", flush=True)
+
     # Test: Inject and run a script to verify server is working
     print(
         "Test: Injecting 'Hello World' script to verify server functionality...",
@@ -131,7 +136,7 @@ console.log("=".repeat(50) + "\\n");
             print(f"  Trying target: {app}", flush=True)
             try:
                 result = run(
-                    ["frida", "-U", "-l", script_path, "-f", app, "--no-pause"],
+                    ["frida", "-H", "127.0.0.1:27043", "-l", script_path, "-f", app],
                     capture_output=True,
                     timeout=15,
                     check=False,

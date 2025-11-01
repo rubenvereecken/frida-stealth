@@ -37,6 +37,13 @@ def main(argv: list[str]):
         action="store_true",
         help="Keep build directory after installation",
     )
+    parser.add_argument(
+        "--no-start",
+        dest="start",
+        action="store_false",
+        default=True,
+        help="Do not start frida-server after installation",
+    )
     args = parser.parse_args(argv[1:])
 
     print("=== Frida Android ARM64 Build & Install ===\n", flush=True)
@@ -81,7 +88,7 @@ def main(argv: list[str]):
 
         # Deploy
         remote_path = f"/data/local/tmp/{args.name}"
-        deploy(frida_server, remote_path, device_id)
+        deploy(frida_server, remote_path, device_id, start_server=args.start)
 
         # Success
         print(f"\n✓ frida-server installed as {remote_path}", flush=True)
@@ -184,7 +191,9 @@ def find_frida_server(build_dir: Path) -> Path | None:
     return None
 
 
-def deploy(frida_server: Path, remote_path: str, device_id: str):
+def deploy(
+    frida_server: Path, remote_path: str, device_id: str, start_server: bool = True
+):
     print("Deploying frida-server to device...", flush=True)
 
     # Push to device
@@ -194,6 +203,10 @@ def deploy(frida_server: Path, remote_path: str, device_id: str):
     # Make executable
     run(["adb", "-s", device_id, "shell", "chmod", "755", remote_path])
     print("✓ Made executable", flush=True)
+
+    if not start_server:
+        print("Skipping frida-server startup (--no-start specified)", flush=True)
+        return
 
     # Kill any existing frida-server instances
     print("Stopping any existing frida-server instances...", flush=True)
