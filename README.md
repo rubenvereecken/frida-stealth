@@ -53,6 +53,19 @@ git submodule update --init --recursive
 
 Then build Frida as normal. For detailed build instructions, see the [official Frida documentation](https://frida.re/docs/building/).
 
+**Important:** Build frida-tools from this repo for seamless compatibility. The stealth patches change the default port (27042→27043), so using vanilla frida-tools requires manual port forwarding:
+
+```bash
+# If using vanilla frida-tools with stealth frida-server:
+adb forward tcp:27043 tcp:27043
+frida -H 127.0.0.1:27043 ...
+
+# If using stealth frida-tools (recommended):
+frida -U ...  # Just works!
+```
+
+To build frida-tools, include `--enable-frida-tools` when configuring native builds.
+
 ### Option 2: Manual Patching (For Maintainers)
 
 If you're maintaining your own Frida fork, apply patches manually:
